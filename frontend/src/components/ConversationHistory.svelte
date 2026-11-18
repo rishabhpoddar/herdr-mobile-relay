@@ -513,7 +513,13 @@
       void tick().then(() => restoreScrollAnchor(anchor.anchor, anchor.top, anchor.height));
     }
     if (readingAnchor && !pendingAnchor) void tick().then(() => restoreScrollAnchor(readingAnchor));
-    if (next.requestPhase === 'idle' && wasLoadingOlder) pendingAnchor = null;
+    if (next.requestPhase !== 'idle' || !wasLoadingOlder) return;
+    const unanswered = pendingAnchor && !next.error && !query.trim()
+      && filteredEntries[0]?.id === pendingAnchor.firstEntryId;
+    pendingAnchor = null;
+    // A page of tool activity adds nothing to Conversation mode. The reader is
+    // then still at the top, where another swipe fires no scroll to ask again.
+    if (unanswered) void tick().then(demandOlder);
   }
 
   function cancelHistoryRequests() {
@@ -542,7 +548,7 @@
     historyController?.pausePreparation();
   }
 
-  type PendingScrollAnchor = { anchor: ScrollAnchor | null; top: number; height: number };
+  type PendingScrollAnchor = { anchor: ScrollAnchor | null; top: number; height: number; firstEntryId?: string };
   let pendingAnchor: PendingScrollAnchor | null = null;
 
   function demandOlder() {
@@ -571,6 +577,7 @@
       anchor: topVisibleEntry(),
       top: listElement?.scrollTop || 0,
       height: listElement?.scrollHeight || 0,
+      firstEntryId: filteredEntries[0]?.id,
     };
     pinnedToBottom = false;
     historyController.demandOlder();

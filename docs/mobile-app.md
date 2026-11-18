@@ -404,7 +404,9 @@ anchor session can show newer continuation sessions in order. Conversation
 History opens with a small recent page (currently up to 24 raw records), without
 eagerly crawling tool-only pages or incomplete exchanges. Older history loads
 on upward scroll demand or explicit **Load older turns**, preserving the visible
-anchor. Changing modes or a short viewport does not automatically fetch older
+anchor. A loaded page that adds nothing to the current view, such as a run of
+tool calls in Conversation mode, does not satisfy that demand: loading continues
+until an earlier message appears or the beginning is reached. Changing modes or a short viewport does not automatically fetch older
 pages. A small in-memory preview can appear immediately on
 a warm reopen while the current latest page is checked; it is bounded, never
 persisted by the browser, and never authorizes a cursor or proves that history

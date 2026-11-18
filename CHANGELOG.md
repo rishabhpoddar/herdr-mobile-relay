@@ -27,6 +27,9 @@ project follows [Semantic Versioning](https://semver.org/).
 - Idle agents no longer look finished on the phone. The idle ring let a light
   logo, such as Claude Code's or Codex's, show through its centre, so it looked
   like the filled dot of an unread result.
+- Swiping up in Conversation now keeps loading earlier messages after a long
+  run of tool calls. A page with only tool activity added nothing to the view,
+  so the list stayed at the top and further swipes did nothing.
 
 ## [0.24.0] - 2026-11-02
 
