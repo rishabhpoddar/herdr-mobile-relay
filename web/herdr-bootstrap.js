@@ -1,4 +1,4 @@
-const e = new URL(window.__HERDR_ENTRY__ || "/builds/0.24.0-488-ae2dc337623fe6d3/index.html", location);
+const e = new URL(window.__HERDR_ENTRY__ || "/builds/0.25.1-492-725a4068f14af3d0/index.html", location);
   e.search = location.search;
   e.hash = location.hash;
   location.replace(e);
