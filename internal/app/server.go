@@ -227,7 +227,9 @@ func New(cfg *config.Config, version, revision string, logger *slog.Logger) *Ser
 	if strings.TrimSpace(cfg.CacheDir) != "" {
 		cacheRoot = filepath.Join(cfg.CacheDir, "conversation-history")
 	}
-	conversationBrowser, browserErr := conversation.NewBrowser(conversationReader, cacheRoot, conversation.DefaultBrowserOptions())
+	browserOptions := conversation.DefaultBrowserOptions()
+	browserOptions.CapacityObserver = conversationCapacityLogger(logger)
+	conversationBrowser, browserErr := conversation.NewBrowser(conversationReader, cacheRoot, browserOptions)
 	if browserErr != nil {
 		logger.Warn("interactive conversation browsing unavailable", "error", browserErr)
 	}
@@ -1317,7 +1319,7 @@ func (s *Server) Run(ctx context.Context) error {
 
 	s.poller.SetEnrich(func(ctx context.Context, agents []*coordinator.AgentState) {
 		s.enrichPiSessions(ctx, agents)
-		s.enrichHermesSessions(ctx, agents)
+		s.enrichRegistrySessions(ctx, agents)
 		s.enrichKimiSessions(ctx, agents)
 		for _, a := range agents {
 			s.resolveAgentSessionName(a)
@@ -1582,6 +1584,8 @@ func (s *Server) effectiveCapabilitiesFor(herdrStatus herdr.ServerStatus) []stri
 	}
 	for _, feature := range []string{
 		herdr.FeatureWorkspaceManagement,
+		herdr.FeatureWorkspaceRename,
+		herdr.FeatureWorkspaceReorder,
 		herdr.FeatureWorktreeManagement,
 		herdr.FeatureTabRename,
 		herdr.FeatureAgentLaunch,

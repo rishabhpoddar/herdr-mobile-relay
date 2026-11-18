@@ -3,7 +3,8 @@
 Set `HERDR_RELAY_BACKEND=hc` to connect to herdr-core, the backend used by
 herdr-app, instead of the Herdr TUI. Each relay process has one backend. Run two
 relays to use both: the phone shows `<hostname>` and `<hostname> (core)` as two
-computers. Install and pair each instance separately with the commands below.
+computers. Install and pair each instance separately, with the setup menu or the
+commands below.
 
 ## Available on core
 
@@ -13,13 +14,18 @@ computers. Install and pair each instance separately with the commands below.
   be single-line and contain no control characters.
 - Secret input to a verified no-echo prompt, without input-side persistence.
   Programs that echo or log a secret can still expose it in terminal output.
-- Start agents with **+**, and stop, clear or restart relay-launched agents.
-  Clear and Restart start a replacement in a new terminal, then kill the old one.
-  herdr.app names the adopted new tab itself; the terminal carries the agent name.
+- Start agents with **+**, and stop, clear or restart agents. Clear and Restart
+  run the agent's recorded launch profile, or else the profile matching its
+  name, so options from the original command line are not kept.
+  Clear and Restart start a replacement in the same tab, then kill the old terminal
+  after waiting up to five seconds for herdr.app to adopt the replacement. If adoption
+  is not confirmed in time, the old terminal is still killed and the tab may come back unnamed.
+  New tabs receive the requested name if herdr.app adopts them within a minute;
+  otherwise the agent still starts, with an unnamed tab.
   Initial prompts wait for reported idle status; otherwise launch completes with
   a warning and leaves the prompt unsent.
-- Rename and reorder tabs in herdr-app. Either action can be refused when the
-  desktop changed the layout at the same moment; try again.
+- Rename and reorder tabs and workspaces in herdr-app. These actions can be
+  refused when the desktop changed the layout at the same moment; try again.
 - Pane size leasing (Resize Session). The phone's size applies to the shared
   core terminal, so herdr-app shows the phone's layout while a device leases,
   as with Resize Session on the TUI. The desktop can take the size back by
@@ -30,53 +36,39 @@ computers. Install and pair each instance separately with the commands below.
   relay owns the shared Pi extension.
 
 The phone hides actions that core does not support: agent identity renaming;
-tab creation and close; workspace and worktree management; the Pi
+tab creation and close; creating and closing workspaces, and worktrees; the Pi
 integration switch; phone-driven relay updates and app deploys. Core upgrades
 are manual.
 
-## How the core relay learns agent sessions
+## Conversation on core
 
-The `herdr-mobile-relay agent-session claude|codex|cursor|omp` hook command reads a
-SessionStart payload and reports its `session_id` through terminal labels:
-`herdr-mobile-relay.session` and `herdr-mobile-relay.pid`, written together.
-It uses only `HC_TERMINAL_ID` and `HC_TERMINAL_SOCKET`, and accepts the
-foreground pid only when it is an ancestor of the hook. The relay uses the
-session only while that pid remains the terminal's foreground pid, ignoring
-stale labels. Pi still discovers sessions through its bridge when no label
-session applies.
+| Agent | How its session is found | What the user does |
+| --- | --- | --- |
+| Pi | Pi bridge; used when no label session applies. | Install this release's bridge through the TUI relay, which owns the shared extension; reload Pi. |
+| Claude Code | `SessionStart` hook in `~/.claude/settings.json`. | Install hooks and restart. |
+| Codex | `SessionStart` hook in `~/.codex/hooks.json`, after the first prompt of each start or resume. | Install hooks, enable `[features] hooks = true` (also enabled by Herdr), and trust the hook in `/hooks`. Phone-started Codex needs nothing extra: the core relay adds `--no-daemon`. For desktop starts, use `codex --no-daemon`. |
+| Cursor | Flat `sessionStart` hook in `~/.cursor/hooks.json`. | Install hooks and restart cursor-agent. Appears only once Herdr recognises it; it sends no OSC 7501 status. |
+| Omp | Extension in `~/.omp/agent/extensions/herdr-mobile-relay-session.ts` reports starts and switches. | Install hooks and restart. |
+| OpenCode | Plugin in `~/.config/opencode/herdr-mobile-relay-session/tui.js`, registered alongside Herdr's plugin in `cli.json`, follows the displayed session to its root parent. | Convert `cli.json` to strict JSON (no comments or trailing commas) before install or uninstall; install hooks and restart. |
+| Qoder | `SessionStart` hook in `~/.qoder/settings.json`; subagent events ignored. | Install hooks and restart qodercli. |
+| agy (Antigravity CLI) | Named `herdr-mobile-relay` hook in `~/.gemini/config/hooks.json` reads `conversationId`. | Install hooks, restart agy and start a new conversation; `SessionStart` fires for new conversations only. |
+| Hermes | `runtime/active_sessions.json` under configured Hermes roots; exactly one CLI entry matching foreground PID and process creation time. | No hook. Appears only once Herdr recognises it; it sends no OSC 7501 status. |
+| Grok | `~/.grok/active_sessions.json`; unique foreground PID and process start-time match (within 1 ms). | No hook for grok-build. |
+| Kimi | Native journals, working directory and foreground process, as on the TUI. | No hook for kimi-code; subscription errors cannot produce a conversation. |
 
-## Conversation for Claude Code, Codex, Cursor, Omp and Hermes
+Run `herdr-mobile-relay agent-hooks install`, `status` or `uninstall` to manage
+the relay's hooks. Other hooks are preserved; missing config directories are
+skipped. Hooks do nothing outside core terminals: they use `HC_TERMINAL_ID`
+and `HC_TERMINAL_SOCKET`, verify foreground PID ancestry, and write
+`herdr-mobile-relay.session` and `herdr-mobile-relay.pid` together. Labels
+apply only while that PID stays foreground; missing, stale or ambiguous
+session evidence leaves Conversation unavailable.
 
-Run `herdr-mobile-relay agent-hooks install` once from a terminal to enable
-Conversation for Claude Code, Codex, Cursor (cursor-agent) and Omp. Restart
-running agents to load the hooks. The hook does nothing outside a core terminal.
-Cursor adds a flat `sessionStart` command in `~/.cursor/hooks.json`. Omp uses
-`~/.omp/agent/extensions/herdr-mobile-relay-session.ts`, reporting session start
-and switch events without changing Herdr's extension.
-
-Hermes needs no hook. On core, the relay reads `runtime/active_sessions.json`
-under its configured Hermes roots. It accepts exactly one CLI entry matching the
-terminal foreground PID and its process creation time; missing, stale or
-ambiguous evidence leaves Conversation unavailable.
-
-Use `herdr-mobile-relay agent-hooks status` to check installation and
-`herdr-mobile-relay agent-hooks uninstall` to remove only the relay's hooks.
-Existing Herdr hooks are preserved; missing agent config directories are skipped.
-Codex also needs `[features] hooks = true` in its `config.toml`, as enabled by
-Herdr's Codex integration. After installing, open `/hooks` in Codex once and
-trust the new SessionStart hook: Codex shows "1 hook needs review before it can
-run" until approved. Codex stores approval under `[hooks.state]` in
-`~/.codex/config.toml`; the installer never writes that trust and leaves this
-file unchanged.
-
-In herdr.app terminals, start Codex with `codex --no-daemon`. By default, Codex
-runs hooks in a shared background server, outside the terminal, so its sessions
-cannot be matched to their terminal. Codex runs its session-start hook only when
-the first prompt is sent, so Conversation appears after the first prompt of each
-start or resume.
-
-To do this only inside Herdr (herdr.app terminals and Herdr TUI panes), add to
-`~/.zshrc`:
+Codex shows "1 hook needs review before it can run" until approved in `/hooks`.
+Approval lives under `[hooks.state]` in `~/.codex/config.toml`; the installer
+leaves that file and trust unchanged. Use `codex --no-daemon` in herdr.app:
+the default shared background server runs hooks outside the terminal.
+To apply this only inside Herdr (core terminals and TUI panes), add to `~/.zshrc`:
 
 ```zsh
 if [[ -n "$HC_TERMINAL_ID" || -n "$HERDR_PANE_ID" ]]; then
@@ -131,6 +123,32 @@ Use the same installed release as the TUI relay. Start herdr-app or run
 starts or stops it; relay inventory readiness checks connectivity.
 For a non-default core, set `HC_SESSION`, `HC_SOCKET` or `HC_SOCKET_PATH`
 on the initial setup command; default paths are resolved in the service environment.
+
+### With the setup menu
+
+Open the menu from the Herdr plugin (**Herdr Mobile Relay: Setup**), or from the
+installed release, which also works on a computer with herdr-app and no `herdr`
+command (`install.sh` prints this command when it finishes):
+
+```bash
+bash "${HERDR_RELEASE_ROOT:-${XDG_DATA_HOME:-$HOME/.local/share}/herdr-mobile-relay}/current/relay/plugin-setup-menu.sh"
+```
+
+The menu shows the status of each relay it finds: **Herdr TUI relay** (the phone
+shows `<host>`) and **Herdr app relay** (the phone shows `<host> (core)`). When
+both exist it first asks what the phone should control:
+
+- **Herdr TUI**: the usual menu.
+- **Herdr app (core)**: Cloudflare (temporary tunnel, stable tunnel, change
+  hostname, remove) and Tailscale on port 8444. No WebRTC and no app deployment.
+- **Both**: Cloudflare stable tunnel or Always on Tailscale, run for the TUI
+  relay and then for the core relay with one transport for both, each followed
+  by its own QR. Temporary tunnels run in the foreground, so they are not offered.
+
+Each QR says which computer it adds. Scan both in the same phone app. **b** goes
+back to the first question.
+
+### With commands
 
 Every command below selects core with `HERDR_RELAY_BACKEND=hc`. Its private env
 is `${XDG_CONFIG_HOME:-$HOME/.config}/herdr-mobile-relay-hc/relay.env`, not the
@@ -218,7 +236,7 @@ core uninstall preserves the shared release, CLI, TUI plugin, Pi extension and
 agent hooks. Full TUI uninstall refuses while the core service remains installed;
 remove core first.
 
-WebRTC gateway transport and plugin menu entry points are refused on core.
-Phone-driven updates, app deployment and Pi integration management remain
-TUI-only. Updating the shared release changes what both services use on their
+WebRTC gateway transport is refused on core, and the Herdr plugin's build and
+pane launchers are TUI-only. Phone-driven updates, app deployment and Pi
+integration management remain TUI-only. Updating the shared release changes what both services use on their
 next restart; reinstall/restart the core service manually after updating.

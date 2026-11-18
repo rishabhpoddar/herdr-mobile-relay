@@ -54,6 +54,9 @@ func run(args []string) (int, error) {
 		}
 		return status(agentsession.Hooks(args[0], os.Stdout))
 	case "agent-session":
+		if len(args) > 0 && args[0] == "agy" {
+			defer fmt.Fprint(os.Stdout, "{}")
+		}
 		if len(args) == 1 {
 			agentsession.Run(args[0], os.Stdin)
 		}
@@ -65,7 +68,7 @@ func run(args []string) (int, error) {
 		return runServe()
 	case "version":
 		if len(args) == 1 && args[0] == "--json" {
-			data, _ := json.Marshal(map[string]string{"version": version, "revision": revision, "target": release.CurrentTarget()})
+			data, _ := json.Marshal(map[string]any{"version": version, "revision": revision, "target": release.CurrentTarget(), "backends": []string{"herdr", "hc"}})
 			fmt.Println(string(data))
 			return 0, nil
 		}
