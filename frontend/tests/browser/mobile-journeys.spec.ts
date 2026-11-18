@@ -5294,6 +5294,70 @@ test('keeps loading older conversation past a page of tool activity without anot
   await expect(page.getByText('Beginning of conversation reached.')).toBeVisible();
 });
 
+test('loads older conversation when a swipe up cannot scroll a short conversation', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('herdr_default_agent_view', 'terminal'));
+  await boot(page, [fedora]);
+  await expect.poll(() => socketCount(page)).toBe(1);
+  await handshake(page, 0, {
+    capabilities: ['attention_classification', 'structured_questions', 'slash_commands', 'conversation_history'],
+  });
+  await server(page, 0, {
+    type: 'agents',
+    agents: [{
+      pane_id: 'w1:p1',
+      status: 'working',
+      project: 'Short history',
+      agent: 'claude',
+      server_session_id: 'session-1',
+      terminal_id: 'terminal-1',
+      generation: 1,
+      conversation_history_available: true,
+      agent_session_id: 'short-session',
+    }],
+  });
+  // A long agent turn: Conversation mode keeps only its prompt and final answer.
+  const latest = [
+    { id: 'latest-user', timestamp: '', role: 'user', text: 'latest question' },
+    ...Array.from({ length: 20 }, (_, index) => ({
+      id: `latest-tool-${index}`,
+      timestamp: '',
+      role: 'assistant',
+      text: '',
+      tools: [{ name: 'Bash', input: `step ${index}`, output: 'ok' }],
+    })),
+    { id: 'latest-answer', timestamp: '', role: 'assistant', text: 'latest answer' },
+  ];
+  const earlier = Array.from({ length: 12 }, (_, index) => [
+    { id: `earlier-user-${index}`, timestamp: '', role: 'user', text: `earlier question ${index}` },
+    { id: `earlier-answer-${index}`, timestamp: '', role: 'assistant', text: `earlier answer ${index}` },
+  ]).flat();
+  await setConversationFixture(page, {
+    entries: latest,
+    total: latest.length + earlier.length,
+    nextCursor: 'older-1',
+    hasMore: true,
+    pages: { 'older-1': { entries: earlier } },
+  });
+
+  await page.getByRole('button', { name: 'Open Short history on Fedora' }).click();
+  await page.getByRole('button', { name: 'Conversation history' }).click();
+  const list = page.locator('.conversation-list');
+  await expect(page.getByText('latest answer')).toBeVisible();
+  expect(await list.evaluate((element) => element.scrollHeight <= element.clientHeight)).toBe(true);
+  const olderRequests = async () => (await commands(page))
+    .filter((command) => command.type === 'get_conversation_history' && command.cursor === 'older-1').length;
+
+  // A list that cannot scroll fires no scroll event, so only the drag says "older".
+  await list.dispatchEvent('touchstart', { touches: [{ identifier: 1, clientX: 200, clientY: 300 }] });
+  await list.dispatchEvent('touchmove', { touches: [{ identifier: 1, clientX: 200, clientY: 310 }] });
+  expect(await olderRequests()).toBe(0);
+  await list.dispatchEvent('touchmove', { touches: [{ identifier: 1, clientX: 200, clientY: 420 }] });
+  await list.dispatchEvent('touchend', { touches: [] });
+  await expect.poll(olderRequests).toBe(1);
+  await expect(page.getByText('earlier answer 11')).toBeAttached();
+  await expect(page.getByText('Beginning of conversation reached.')).toBeVisible();
+});
+
 test('retains a Claude continuation cursor through repeated preparation', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('herdr_default_agent_view', 'terminal'));
   await boot(page, [fedora]);
@@ -9302,3 +9366,4 @@ for (const mode of ['Conversation', 'Full history']) {
     }
   });
 }
+

@@ -586,6 +586,31 @@
   function loadOlder() {
     demandOlder();
   }
+
+  // At the top, or while the turns do not fill the screen, a swipe up cannot
+  // scroll the list, so no scroll event arrives to ask for older turns.
+  let topPullStartY: number | null = null;
+
+  function startTopPull(event: TouchEvent): void {
+    topPullStartY = listElement?.scrollTop <= 0 ? event.touches[0]?.clientY ?? null : null;
+  }
+
+  function trackTopPull(event: TouchEvent): void {
+    const y = event.touches[0]?.clientY;
+    if (topPullStartY === null || y === undefined || y - topPullStartY < 24) return;
+    topPullStartY = null;
+    demandOlderAtTop();
+  }
+
+  function wheelAtTop(event: WheelEvent): void {
+    if (event.deltaY < 0) demandOlderAtTop();
+  }
+
+  function demandOlderAtTop(): void {
+    if (!listElement || listElement.scrollTop > 0 || query.trim()) return;
+    if (document.visibilityState === 'hidden' || $securityState.locked) return;
+    demandOlder();
+  }
   function toggleSpeech(text: string): void {
     if ($speechState === 'speaking') {
       stopSpeech();
@@ -794,6 +819,9 @@
       class="conversation-list"
       bind:this={listElement}
       onscroll={trackScroll}
+      ontouchstart={startTopPull}
+      ontouchmove={trackTopPull}
+      onwheel={wheelAtTop}
       onpointerdown={prepareScroll}
       onfocusin={prepareScroll}
       aria-label={`Conversation with ${agentName}`}

@@ -7,9 +7,10 @@ project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
-- Swiping up in Conversation now keeps loading earlier messages after a long
-  run of tool calls. A page with only tool activity added nothing to the view,
-  so the list stayed at the top and further swipes did nothing.
+- Swiping up in Conversation now loads earlier messages even when the newest
+  turns are too short to fill the screen, and keeps loading after a long run of
+  tool calls. A list that could not scroll ignored the swipe, so older messages
+  only came from the Load older turns button.
 
 ## [0.25.1] - 2026-11-10
 
