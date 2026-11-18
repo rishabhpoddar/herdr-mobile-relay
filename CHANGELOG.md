@@ -7,6 +7,11 @@ project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Scrolling up in a Claude Code or Qoder terminal now reaches earlier output.
+  These agents keep no terminal scrollback, and the history the relay rebuilds
+  for them was dropped while Resize Session fitted the pane to the phone, so
+  only one screen was scrollable. Their panes now stay at the computer's size
+  and wrap to the phone width instead.
 - Swiping up in Conversation now loads earlier messages even when the newest
   turns are too short to fill the screen, and keeps loading after a long run of
   tool calls. A list that could not scroll ignored the swipe, so older messages

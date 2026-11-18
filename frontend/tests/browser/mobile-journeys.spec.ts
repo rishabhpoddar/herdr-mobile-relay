@@ -2689,6 +2689,36 @@ test('followup defaults: explicitly saved Resize Session off stays off', async (
   expect(await releaseCommands(page)).toHaveLength(0);
 });
 
+test('keeps Claude panes at their own size so relay history scrolls, wrapped to the phone', async ({ page }) => {
+  await boot(page, [fedora]);
+  await expect.poll(() => socketCount(page)).toBe(1);
+  await handshake(page, 0, { capabilities: optInCapabilities });
+  await server(page, 0, {
+    type: 'agents',
+    agents: [{ pane_id: 'w1:p1', status: 'working', project: 'Claude pane', agent: 'claude' }],
+  });
+  await page.getByRole('button', { name: 'Open Claude pane on Fedora' }).click();
+  await expect.poll(async () => (await commands(page)).some((command) => command.type === 'read_pane')).toBe(true);
+  // Claude keeps no scrollback; this history is what the relay rebuilt for it.
+  const read = (await commands(page)).findLast((command) => command.type === 'read_pane');
+  const history = Array.from({ length: 300 }, (_, index) => `claude history ${index + 1} ${'desktop width output '.repeat(8)}`);
+  await server(page, 0, {
+    type: 'pane_content', pane_id: 'w1:p1', format: 'ansi',
+    request_id: read?.request_id, target: read?.target, content: history.join('\n'),
+  });
+  const terminal = page.getByRole('log');
+  await expect(terminal).toContainText('claude history 300');
+  await page.waitForTimeout(300);
+  expect(await leaseCommands(page)).toHaveLength(0);
+  await expect.poll(() => terminal.evaluate((element) => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
+
+  await terminal.evaluate((element) => {
+    element.scrollTop = 0;
+    element.dispatchEvent(new Event('scroll'));
+  });
+  await expect(terminal.locator('[data-terminal-row="0"]')).toContainText('claude history 1 ');
+});
+
 test('never leases on the legacy capability alone, even with consent saved', async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem('herdr_terminal_resize_session', 'true');

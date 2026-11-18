@@ -282,6 +282,10 @@ the pane open. A saved off choice stays off. Turn it off to avoid these costs:
 - It is available only on relays that advertise it (Linux and macOS relays
   from this release on). Elsewhere the switch has no effect and the terminal
   keeps the default layout; no error is shown.
+- Claude Code and Qoder panes are never resized. These agents keep no terminal
+  scrollback, and the relay adds the history it rebuilt for them only to reads
+  at the pane's own size, so a resized pane would scroll back one screen.
+  They wrap to the phone width instead, like reader panes.
 
 While a pane is leased, a hidden page keeps renewing for five minutes, because
 desktop Safari reports an occluded window as hidden and brief app switches

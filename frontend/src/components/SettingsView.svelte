@@ -864,7 +864,7 @@
         if (setTerminalResizeSession(value) === 'unavailable') relayStore.showToast('Resize Session preference could not be saved.');
       }}
     />
-    <p class="hint" id="resize-session-hint">On by default, saved on this device. Resizes the shared terminal to fit this phone while the phone has it open. Until the phone lets go, the laptop and SSH views of that pane look garbled, and agents may leave narrow copies of their output in the scrollback. Resizing may truncate scrollback and lose older output. The previous size is restored when the phone leaves the pane, unless it was changed on the laptop meanwhile. Unavailable on relays that do not support it. When off, controller terminals keep the desktop width and scroll horizontally; read-only reader panes wrap to the phone width.</p>
+    <p class="hint" id="resize-session-hint">On by default, saved on this device. Resizes the shared terminal to fit this phone while the phone has it open. Until the phone lets go, the laptop and SSH views of that pane look garbled, and agents may leave narrow copies of their output in the scrollback. Resizing may truncate scrollback and lose older output. The previous size is restored when the phone leaves the pane, unless it was changed on the laptop meanwhile. Unavailable on relays that do not support it. Claude Code and Qoder panes are never resized, so their history stays scrollable; they wrap to the phone width instead. When off, controller terminals keep the desktop width and scroll horizontally; read-only reader panes wrap to the phone width.</p>
     <AppSwitch
       checked={$terminalHeightLease}
       disabled={!$terminalResizeSession || !heightLeaseSupported}

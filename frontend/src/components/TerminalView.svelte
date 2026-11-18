@@ -202,10 +202,16 @@
   // relay, and the relay advertises the opt-in capability. The legacy
   // pane_size_lease name is ignored: a relay offering only that resizes on any
   // lease, with no opt-in check.
-  const resizeSessionActive = $derived(
+  const resizeSessionWanted = $derived(
     Boolean($terminalResizeSession
       && !readOnly && $connections.get(agent.relay_id)?.capabilities.includes('pane_size_opt_in')),
   );
+  // Claude Code and Qoder keep no terminal scrollback. The relay rebuilds
+  // their history, but only into reads at the pane's own size, so resizing
+  // them would leave one screen to scroll. They wrap at the phone instead.
+  const keepsOwnSize = $derived(/claude|qoder/i.test(agent.agent || ''));
+  const resizeSessionActive = $derived(resizeSessionWanted && !keepsOwnSize);
+  const wrapsWithoutLease = $derived(readOnly || (resizeSessionWanted && keepsOwnSize));
   // The capability only says the relay can lease; it does not mean this pane
   // has a width yet. The wrapping layout is engaged solely when it does.
   const resizeLayoutActive = $derived(terminalResizeLayoutEngaged(
@@ -220,7 +226,7 @@
   // those rows wrap at the container instead of stranding the reader on line
   // tails after every refresh. Readers use the same wrapping regime because
   // their role can never obtain a size lease.
-  const resizeLayoutPending = $derived(readOnly || (resizeSessionActive && !resizeLayoutActive));
+  const resizeLayoutPending = $derived(wrapsWithoutLease || (resizeSessionActive && !resizeLayoutActive));
   const nextBlocked = $derived(sortedAgents(allAgents.filter((item) => agentNeedsResponse(item) && item.pane_id !== agent.pane_id))[0]);
   const terminalPlainText = $derived(
     stripAnsi(displayed)
@@ -341,7 +347,7 @@
     // measured at the desktop width is stale whether or not the width has landed
     // yet. A reader cannot lease at all, so its rows wrap at the phone instead
     // of trailing off the side of a desktop-width grid.
-    const preserveLineEnds = !resizeSessionActive && !readOnly;
+    const preserveLineEnds = !resizeSessionActive && !wrapsWithoutLease;
     // A frame read while the agent repaints at a new width is transient. Keep
     // the phone's last stable frame painted until the new stable frame lands,
     // but never past the deadline: a relay that keeps flagging frames would
@@ -622,7 +628,7 @@
   async function applyFrame(
     next: TerminalFrame,
     preserve = true,
-    preserveLineEnds = preserve && !resizeSessionActive && !readOnly,
+    preserveLineEnds = preserve && !resizeSessionActive && !wrapsWithoutLease,
   ) {
     if (terminalLayoutSuspended) return;
     const renderColumnCap = resizeLayoutActive
