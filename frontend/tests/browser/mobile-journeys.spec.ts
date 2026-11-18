@@ -5231,6 +5231,69 @@ test('loads older conversation automatically when scrolled near the top', async 
   expect(await list.locator('article').count()).toBeLessThanOrEqual(24);
 });
 
+test('keeps loading older conversation past a page of tool activity without another scroll', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('herdr_default_agent_view', 'terminal'));
+  await boot(page, [fedora]);
+  await expect.poll(() => socketCount(page)).toBe(1);
+  await handshake(page, 0, {
+    capabilities: ['attention_classification', 'structured_questions', 'slash_commands', 'conversation_history'],
+  });
+  await server(page, 0, {
+    type: 'agents',
+    agents: [{
+      pane_id: 'w1:p1',
+      status: 'working',
+      project: 'Tool history',
+      agent: 'claude',
+      server_session_id: 'session-1',
+      terminal_id: 'terminal-1',
+      generation: 1,
+      conversation_history_available: true,
+      agent_session_id: 'tool-session',
+    }],
+  });
+  const exchanges = (name: string) => Array.from({ length: 12 }, (_, index) => [
+    { id: `${name}-user-${index}`, timestamp: '', role: 'user', text: `${name} question ${index}` },
+    { id: `${name}-answer-${index}`, timestamp: '', role: 'assistant', text: `${name} answer ${index}` },
+  ]).flat();
+  // One long agent turn: Conversation mode shows none of these records.
+  const toolActivity = Array.from({ length: 24 }, (_, index) => ({
+    id: `tool-${index}`,
+    timestamp: '',
+    role: 'assistant',
+    text: '',
+    tools: [{ name: 'Bash', input: `step ${index}`, output: 'ok' }],
+  }));
+  await setConversationFixture(page, {
+    entries: exchanges('latest'),
+    total: 72,
+    nextCursor: 'older-1',
+    hasMore: true,
+    pages: {
+      'older-1': { entries: toolActivity, nextCursor: 'older-2', hasMore: true },
+      'older-2': { entries: exchanges('earlier') },
+    },
+  });
+
+  await page.getByRole('button', { name: 'Open Tool history on Fedora' }).click();
+  await page.getByRole('button', { name: 'Conversation history' }).click();
+  const list = page.locator('.conversation-list');
+  await expect(page.getByText('latest answer 11')).toBeVisible();
+
+  // Reaching the very top is the reader's only scroll: from there a swipe
+  // cannot move the list, so it fires no further scroll event.
+  await list.dispatchEvent('pointerdown', { pointerType: 'touch' });
+  await list.evaluate((element) => {
+    element.scrollTop = 0;
+    element.dispatchEvent(new Event('scroll'));
+  });
+  await expect.poll(async () => (await commands(page))
+    .filter((command) => command.type === 'get_conversation_history')
+    .map((command) => command.cursor || '')).toEqual(['', 'older-1', 'older-2']);
+  await expect(page.getByText('earlier answer 11')).toBeAttached();
+  await expect(page.getByText('Beginning of conversation reached.')).toBeVisible();
+});
+
 test('retains a Claude continuation cursor through repeated preparation', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('herdr_default_agent_view', 'terminal'));
   await boot(page, [fedora]);
